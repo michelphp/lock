@@ -1,0 +1,25 @@
+{
+  "name": "michel/lock",
+  "description": "A flexible PHP locking library designed to prevent race conditions in CLI and web environments.",
+  "type": "library",
+  "license": "MPL-2.0",
+  "keywords": ["lock", "flock", "mutex", "process-synchronization", "native-php"],
+  "authors": [
+    {
+      "name": "Michel.F"
+    }
+  ],
+  "autoload": {
+    "psr-4": {
+      "Michel\\Lock\\": "src",
+      "Test\\Michel\\Lock\\": "tests"
+    }
+  },
+  "require": {
+    "php": ">=7.4",
+    "ext-pdo": "*"
+  },
+  "require-dev": {
+    "michel/unitester": "^1.0.0"
+  }
+}
