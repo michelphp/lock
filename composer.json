@@ -16,8 +16,7 @@
     }
   },
   "require": {
-    "php": ">=7.4",
-    "ext-pdo": "*"
+    "php": ">=7.4"
   },
   "require-dev": {
     "michel/unitester": "^1.0.0"
