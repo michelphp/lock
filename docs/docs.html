@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Michel Lock documentation</title>
+<meta name="description" content="Install and use michel/lock: Locker API, keys, blocking and non-blocking locks, automatic release, FlockHandler, writing your own handler, errors.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="site-header">
+  <div class="wrap">
+    <a class="logo" href="./">lock<span>/</span></a>
+    <nav class="site-nav" aria-label="Main">
+      <a href="./">Home</a>
+      <a href="docs.html">Documentation</a>
+      <a href="https://github.com/michelphp/lock">GitHub</a>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+<div class="docs">
+
+<nav class="toc" aria-label="Documentation">
+  <ol>
+    <li><a href="#install">1. Install</a></li>
+    <li><a href="#quick-start">2. Quick start</a></li>
+    <li><a href="#keys">3. Keys</a></li>
+    <li><a href="#wait">4. Waiting or not</a></li>
+    <li><a href="#release">5. Releasing a lock</a></li>
+    <li><a href="#flock">6. FlockHandler</a></li>
+    <li><a href="#handler">7. Your own handler</a></li>
+    <li><a href="#errors">8. Errors</a></li>
+  </ol>
+</nav>
+
+<article>
+<h1>Documentation</h1>
+<p>Two classes and one interface. <code>Locker</code> is what you call; a handler does the actual locking.</p>
+
+<h2 id="install">1. Install</h2>
+<pre>$ composer require michel/lock</pre>
+<p>PHP 7.4 or later. No extension, no other package.</p>
+
+<h2 id="quick-start">2. Quick start</h2>
+<pre><span class="k">use</span> Michel\Lock\Locker;
+<span class="k">use</span> Michel\Lock\Handler\FlockHandler;
+
+$locker = <span class="k">new</span> Locker(<span class="k">new</span> FlockHandler());
+
+<span class="k">if</span> (!$locker->lock(<span class="v">'nightly_import'</span>)) {
+    <span class="k">echo</span> <span class="v">"Already running.\n"</span>;
+    <span class="k">exit</span>(<span class="v">0</span>);
+}
+
+<span class="c">// only one process at a time runs this</span>
+runImport();
+
+$locker->unlock(<span class="v">'nightly_import'</span>);</pre>
+<p>Run this script twice at the same time: the second one prints <code>Already running.</code> and stops.</p>
+
+<h2 id="keys">3. Keys</h2>
+<p>A key names what you protect. Every process that locks the same key, with the same kind of handler, waits for the others.</p>
+<div class="table-box">
+<table>
+  <thead><tr><th>Key</th><th>Accepted</th></tr></thead>
+  <tbody>
+    <tr><td><code>import</code>, <code>report_2026</code>, <code>invoice.42</code></td><td>Yes</td></tr>
+    <tr><td><code>''</code> (empty)</td><td>No</td></tr>
+    <tr><td><code>user-42</code>, <code>../etc</code>, <code>a/b</code>, <code>a b</code></td><td>No: only letters, digits, <code>_</code> and <code>.</code></td></tr>
+  </tbody>
+</table>
+</div>
+<p>To lock on any string (an email, a URL), hash it first: <code>'mail.' . md5($email)</code>.</p>
+
+<h2 id="wait">4. Waiting or not</h2>
+<pre>$locker->lock(<span class="v">'import'</span>);         <span class="c">// non-blocking: false at once if it is taken</span>
+$locker->lock(<span class="v">'import'</span>, <span class="v">true</span>);   <span class="c">// blocking: waits until it is free, then true</span></pre>
+<p>Use non-blocking when a second run is useless (cron jobs, scheduled reports). Use blocking when every run must happen, one after the other (counters, file writes).</p>
+<div class="note"><strong>A blocking lock has no timeout.</strong> If the holder never releases it, the waiting process waits forever. Keep the code between <code>lock()</code> and <code>unlock()</code> short.</div>
+
+<h2 id="release">5. Releasing a lock</h2>
+<p>Three ways, from the most explicit to the safety net:</p>
+<ol>
+  <li><code>$locker-&gt;unlock('import')</code> releases it now.</li>
+  <li>When the <code>Locker</code> object is destroyed, every lock it still holds is released.</li>
+  <li><code>$locker-&gt;unlockIfKill()</code> also releases them when the script ends, after an <code>exit()</code> or a fatal error.</li>
+</ol>
+<pre>$locker = (<span class="k">new</span> Locker(<span class="k">new</span> FlockHandler()))->unlockIfKill();</pre>
+<p>If the process itself is killed, no PHP code runs; with <code>FlockHandler</code>, the operating system releases the file lock of the dead process anyway.</p>
+<p>A <code>Locker</code> only releases the keys it locked: <code>unlock()</code> on another key throws an exception.</p>
+
+<h2 id="flock">6. FlockHandler</h2>
+<p>The default handler. Each key is a file, locked with <code>flock()</code>:</p>
+<pre>$handler = <span class="k">new</span> FlockHandler();                    <span class="c">// sys_get_temp_dir()</span>
+$handler = <span class="k">new</span> FlockHandler(<span class="v">'/var/lock/myapp'</span>);   <span class="c">// your own folder</span></pre>
+<p>The key <code>import</code> is the file <code>&lt;folder&gt;/michel_lock_import.lock</code>. The file stays after <code>unlock()</code>: only the lock on it is released. The folder must exist and be writable.</p>
+<div class="note"><strong>One machine only.</strong> A file lock is seen by the processes of the machine that holds the file. Keep the folder on a local disk: locks on network file systems (NFS, SMB) are not reliable. For several servers, write a handler on a shared backend.</div>
+
+<h2 id="handler">7. Your own handler</h2>
+<p>Implement <code>LockHandlerInterface</code>: take the lock (waiting or not), release it.</p>
+<pre><span class="k">interface</span> LockHandlerInterface
+{
+    <span class="k">public function</span> lock(string $key, bool $wait = <span class="v">false</span>): bool;
+    <span class="k">public function</span> unlock(string $key): void;
+}</pre>
+<p>For example, a lock shared by every server using the same MariaDB or MySQL database:</p>
+<pre><span class="k">use</span> Michel\Lock\LockHandlerInterface;
+
+<span class="k">final class</span> MysqlLockHandler <span class="k">implements</span> LockHandlerInterface
+{
+    <span class="k">private</span> \PDO $pdo;
+
+    <span class="k">public function</span> __construct(\PDO $pdo)
+    {
+        $this->pdo = $pdo;
+    }
+
+    <span class="k">public function</span> lock(string $key, bool $wait = <span class="v">false</span>): bool
+    {
+        $statement = $this->pdo->prepare(<span class="v">'SELECT GET_LOCK(?, ?)'</span>);
+        $statement->execute([$key, $wait ? <span class="v">-1</span> : <span class="v">0</span>]);   <span class="c">// -1: wait without limit</span>
+        <span class="k">return</span> (int) $statement->fetchColumn() === <span class="v">1</span>;
+    }
+
+    <span class="k">public function</span> unlock(string $key): void
+    {
+        $this->pdo->prepare(<span class="v">'SELECT RELEASE_LOCK(?)'</span>)->execute([$key]);
+    }
+}
+
+$locker = <span class="k">new</span> Locker(<span class="k">new</span> MysqlLockHandler($pdo));</pre>
+<p><code>Locker</code> checks the keys and tracks what it holds; your handler only talks to its backend.</p>
+
+<h2 id="errors">8. Errors</h2>
+<div class="table-box">
+<table>
+  <thead><tr><th>Situation</th><th>Result</th></tr></thead>
+  <tbody>
+    <tr><td>Empty key, or a character other than letters, digits, <code>_</code>, <code>.</code></td><td><code>InvalidArgumentException</code> from <code>lock()</code></td></tr>
+    <tr><td><code>unlock()</code> of a key this <code>Locker</code> does not hold</td><td><code>InvalidArgumentException</code></td></tr>
+    <tr><td>Key held by another process, non-blocking</td><td><code>lock()</code> returns <code>false</code></td></tr>
+    <tr><td><code>FlockHandler</code> cannot open the lock file</td><td><code>lock()</code> returns <code>false</code></td></tr>
+  </tbody>
+</table>
+</div>
+<p>Errors while releasing locks at destruction or shutdown are written to the PHP error log, never thrown.</p>
+
+</article>
+</div>
+</main>
+
+<footer class="site-footer">
+  <div class="wrap">Michel Lock · <a href="https://github.com/michelphp/lock">Source on GitHub</a></div>
+</footer>
+
+</body>
+</html>

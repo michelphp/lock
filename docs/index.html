@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Michel Lock — one process at a time, in plain PHP</title>
+<meta name="description" content="michel/lock is a small PHP locking library: lock a key, do the work, unlock. File locks by default, your own backend through one interface. No dependency, CLI and web.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="site-header">
+  <div class="wrap">
+    <a class="logo" href="./">lock<span>/</span></a>
+    <nav class="site-nav" aria-label="Main">
+      <a href="#how">How it works</a>
+      <a href="#why">Why Lock</a>
+      <a href="#compare">Compare</a>
+      <a href="docs.html">Documentation</a>
+      <a href="https://github.com/michelphp/lock">GitHub</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <div class="wrap">
+    <div class="hero">
+      <p class="eyebrow">PHP 7.4+ · No dependency · CLI and web</p>
+      <h1>One process at a time.</h1>
+      <p class="lead">Two cron runs, two workers, two requests: only one does the job. Lock a key, do the work, unlock. Plain PHP file locks by default, your own backend when you need it.</p>
+      <div class="actions">
+        <a class="button primary" href="docs.html#install">Install Lock</a>
+        <a class="button" href="docs.html">Read the docs</a>
+      </div>
+    </div>
+  </div>
+
+  <section id="how">
+    <div class="wrap">
+      <p class="label">How it works</p>
+      <h2>Lock. Work. Unlock.</h2>
+      <p class="section-lead">One class to call, one interface to implement. Nothing else to learn.</p>
+      <div class="grid">
+        <div class="card">
+          <h3>1. Lock</h3>
+          <p><code>$locker-&gt;lock('import')</code> takes the lock, or returns <code>false</code> at once if another process holds it. Pass <code>true</code> to wait for it instead.</p>
+        </div>
+        <div class="card">
+          <h3>2. Work</h3>
+          <p>Run the code that must never run twice at the same time: an import, a report, a counter, a payment.</p>
+        </div>
+        <div class="card">
+          <h3>3. Unlock</h3>
+          <p><code>$locker-&gt;unlock('import')</code>. Forgot it, or the script crashed? The lock is released when the <code>Locker</code> is destroyed and when the script ends.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="why">
+    <div class="wrap">
+      <p class="label">Why Lock</p>
+      <h2>Small enough to trust.</h2>
+      <p class="section-lead">A lock guards your most sensitive code. It should be short enough to read in a few minutes.</p>
+      <div class="grid">
+        <div class="card">
+          <h3>No dependency</h3>
+          <p>Pure PHP 7.4+, nothing else in your <code>vendor/</code>. No server, no extension: the default handler uses <code>flock()</code>.</p>
+        </div>
+        <div class="card">
+          <h3>Never stuck</h3>
+          <p>A file lock belongs to the process. If it dies, even killed, the system releases the lock. No stale lock to clean by hand.</p>
+        </div>
+        <div class="card">
+          <h3>Any backend</h3>
+          <p>Need a lock shared by several servers? Implement <code>LockHandlerInterface</code>, two methods, on top of your database or Redis.</p>
+        </div>
+        <div class="card">
+          <h3>Safe keys</h3>
+          <p>Keys accept letters, digits, <code>_</code> and <code>.</code> only. A key can never become a path outside the lock folder.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="compare">
+    <div class="wrap">
+      <p class="label">Compare</p>
+      <h2>Between flock() by hand and a full lock component.</h2>
+      <p class="section-lead">Calling <code>flock()</code> yourself works until you forget a release. A full component brings stores and options you may never use.</p>
+      <div class="table-box">
+        <table>
+          <thead>
+            <tr><th></th><th><code>fopen()</code> + <code>flock()</code></th><th>symfony/lock</th><th class="us">michel/lock</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Backends</td><td>Files</td><td>Many stores: files, PDO, Redis, and more</td><td class="us">Files, or your own handler</td></tr>
+            <tr><td>Release on exit</td><td>By hand</td><td>When the lock object is destroyed</td><td class="us">When the Locker is destroyed, and at shutdown</td></tr>
+            <tr><td>Key check</td><td>None: the key is your file path</td><td>Any string</td><td class="us">Letters, digits, <code>_</code> and <code>.</code></td></tr>
+            <tr><td>Expiring locks, shared locks</td><td>No</td><td>Yes</td><td class="us">No, by design</td></tr>
+            <tr><td>Dependencies</td><td>None</td><td>Symfony component</td><td class="us">None</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section id="never">
+    <div class="wrap">
+      <p class="label">Scope</p>
+      <h2>What Lock will never do</h2>
+      <p class="section-lead">One job: exclusive locks. Everything else belongs to your handler or your application.</p>
+      <ul class="never">
+        <li>add a dependency</li>
+        <li>require a server</li>
+        <li>retry on a timer</li>
+        <li>expire a lock behind your back</li>
+        <li>accept a key that is a path</li>
+      </ul>
+    </div>
+  </section>
+
+  <section id="get">
+    <div class="wrap">
+      <p class="label">Get Lock</p>
+      <h2>One Composer command.</h2>
+      <p class="section-lead">Works in scripts, cron jobs, workers and web requests. <a href="https://github.com/michelphp/paper-orm">PaperORM</a> uses it to keep its sequences unique.</p>
+      <pre>$ composer require michel/lock</pre>
+      <div class="actions">
+        <a class="button primary" href="docs.html#quick-start">Quick start guide</a>
+        <a class="button" href="docs.html#handler">Write your own handler</a>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="site-footer">
+  <div class="wrap">Michel Lock · <a href="https://github.com/michelphp/lock">Source on GitHub</a> · <a href="docs.html">Documentation</a></div>
+</footer>
+
+</body>
+</html>
