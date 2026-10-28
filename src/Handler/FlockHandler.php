@@ -8,7 +8,7 @@ class FlockHandler implements LockHandlerInterface
 {
     private string $lockDir;
     private array $resources = [];
-    public function __construct(string $lockDir = null)
+    public function __construct(?string $lockDir = null)
     {
         $this->lockDir = $lockDir ?? sys_get_temp_dir();
     }
